@@ -1,0 +1,81 @@
+{
+  "name": "react-viewbox-panzoom",
+  "version": "0.1.0",
+  "description": "Headless, dependency-free pan & zoom for SVG via the viewBox attribute — cursor-anchored wheel zoom, touch pinch, drag pan, plus a 1-D label de-overlap solver. Crisp at any zoom.",
+  "author": "Sunny Rangsiman <rangsiman76@gmail.com> (https://github.com/therealsunson)",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build",
+    "demo:dev": "npm --prefix examples/demo run dev",
+    "demo:build": "npm --prefix examples/demo run build"
+  },
+  "keywords": [
+    "react",
+    "svg",
+    "pan",
+    "zoom",
+    "panzoom",
+    "viewbox",
+    "pinch",
+    "wheel",
+    "diagram",
+    "chart",
+    "labels",
+    "declutter",
+    "headless",
+    "hook",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/therealsunson/react-viewbox-panzoom.git"
+  },
+  "homepage": "https://github.com/therealsunson/react-viewbox-panzoom#readme",
+  "bugs": {
+    "url": "https://github.com/therealsunson/react-viewbox-panzoom/issues"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "prettier": "^3.4.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

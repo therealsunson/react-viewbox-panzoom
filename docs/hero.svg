@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif" role="img" aria-label="A technical drawing panned and zoomed via its SVG viewBox, with decluttered ruler labels and a magnifier">
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="lens" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="70%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="639" height="299" rx="16" fill="#f8fafc" stroke="#e2e8f0"/>
+  <rect x="16" y="16" width="608" height="268" rx="10" fill="url(#grid)"/>
+
+  <!-- dashed viewBox frame -->
+  <rect x="60" y="52" width="420" height="200" rx="6" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <g font-size="11" fill="#64748b" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <text x="60" y="44">viewBox="0 0 800 500"</text>
+  </g>
+
+  <!-- the part: concentric body + bolt circle + pilot + center cross -->
+  <g transform="translate(270 152)">
+    <circle r="86" fill="#5b89c6" fill-opacity="0.10" stroke="#5b89c6" stroke-width="2"/>
+    <circle r="58" fill="#4fa987" fill-opacity="0.12" stroke="#4fa987" stroke-width="2"/>
+    <circle r="22" fill="#0f172a" fill-opacity="0.06" stroke="#475569" stroke-width="1.5"/>
+    <g fill="#1e293b">
+      <circle cx="0" cy="-72" r="5"/><circle cx="51" cy="-51" r="5"/><circle cx="72" cy="0" r="5"/>
+      <circle cx="51" cy="51" r="5"/><circle cx="0" cy="72" r="5"/><circle cx="-51" cy="51" r="5"/>
+      <circle cx="-72" cy="0" r="5"/><circle cx="-51" cy="-51" r="5"/>
+    </g>
+    <path d="M-10 0H10M0 -10V10" stroke="#475569" stroke-width="1.5"/>
+  </g>
+
+  <!-- dimension ruler with decluttered labels -->
+  <g stroke="#5b89c6" stroke-width="1.2" opacity="0.85">
+    <line x1="184" y1="232" x2="356" y2="232"/>
+    <line x1="184" y1="227" x2="184" y2="237"/>
+    <line x1="270" y1="227" x2="270" y2="237"/>
+    <line x1="356" y1="227" x2="356" y2="237"/>
+  </g>
+  <g font-size="10" fill="#3b6fb0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" text-anchor="middle">
+    <text x="205" y="248">L1: 86.0</text>
+    <text x="270" y="248">L2: 58.0</text>
+    <text x="335" y="248">PCD: 144</text>
+  </g>
+
+  <!-- magnifier (zoom motif) over the bolt circle -->
+  <g transform="translate(470 96)">
+    <circle r="52" fill="url(#lens)"/>
+    <circle r="52" fill="none" stroke="#0f172a" stroke-width="3" stroke-opacity="0.85"/>
+    <circle r="52" fill="none" stroke="#ffffff" stroke-width="1"/>
+    <line x1="37" y1="37" x2="74" y2="74" stroke="#0f172a" stroke-width="9" stroke-linecap="round" stroke-opacity="0.85"/>
+    <!-- enlarged bolt detail inside the lens -->
+    <g stroke="#4fa987" stroke-width="2.5" fill="#4fa987" fill-opacity="0.12">
+      <circle r="30"/>
+    </g>
+    <g fill="#1e293b">
+      <circle cx="0" cy="-30" r="4.5"/><circle cx="26" cy="-15" r="4.5"/><circle cx="26" cy="15" r="4.5"/>
+      <circle cx="0" cy="30" r="4.5"/><circle cx="-26" cy="15" r="4.5"/><circle cx="-26" cy="-15" r="4.5"/>
+    </g>
+  </g>
+
+  <!-- title lockup -->
+  <g transform="translate(520 250)" text-anchor="end">
+    <text font-size="15" font-weight="700" fill="#0f172a">react-viewbox-panzoom</text>
+    <text y="18" font-size="11" fill="#64748b">crisp pan &amp; zoom for SVG</text>
+  </g>
+</svg>

@@ -2,7 +2,7 @@
   "name": "react-viewbox-panzoom",
   "version": "0.1.0",
   "description": "Headless, dependency-free pan & zoom for SVG via the viewBox attribute — cursor-anchored wheel zoom, touch pinch, drag pan, plus a 1-D label de-overlap solver. Crisp at any zoom.",
-  "author": "Sunny Rangsiman <rangsiman76@gmail.com> (https://github.com/therealsunson)",
+  "author": "Rangsiman Chantasorn (Sunny) <rangsiman76@gmail.com> (https://github.com/therealsunson)",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

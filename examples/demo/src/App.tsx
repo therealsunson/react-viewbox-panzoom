@@ -180,7 +180,7 @@ export default function App() {
       </section>
 
       <footer className="foot">
-        MIT © Sunny Rangsiman · built as an extraction from a production technical-drawing UI
+        MIT © Rangsiman Chantasorn · built as an extraction from a production technical-drawing UI
       </footer>
     </main>
   )

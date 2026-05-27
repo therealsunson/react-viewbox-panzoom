@@ -200,4 +200,4 @@ npm run demo:dev    # run the examples/demo app
 
 ## License
 
-[MIT](./LICENSE) © Sunny Rangsiman
+[MIT](./LICENSE) © Rangsiman Chantasorn (Sunny)

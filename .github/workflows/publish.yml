@@ -1,0 +1,43 @@
+name: Publish
+
+# Publishes react-viewbox-panzoom to npm whenever you push a `v*` tag
+# (e.g. `git tag v0.2.0 && git push --tags`). Also runnable manually from the
+# Actions tab via "Run workflow".
+#
+# Auth: npm OIDC trusted publisher (configured in your npm package settings →
+# Trusted Publisher → this workflow file). No NPM_TOKEN secret required.
+# `id-token: write` permission lets the runner mint the short-lived token that
+# npm exchanges for publish access, and `--provenance` stamps the tarball with
+# a verifiable attestation tying it back to this commit + workflow run.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+
+      # Guard rails: prepublishOnly runs these too, but failing fast here gives
+      # a clearer CI summary if anything regresses before a release.
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - run: npm publish --provenance --access public

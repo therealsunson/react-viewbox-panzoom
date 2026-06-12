@@ -112,3 +112,86 @@ describe('usePanZoomViewBox', () => {
     expect(zoom()).toBeCloseTo(0.8, 5) // 1 / 1.25
   })
 })
+
+/** jsdom has no Touch/TouchEvent constructors — fake the bits the hook reads. */
+function fireTouch(
+  el: Element,
+  type: 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel',
+  touches: Array<{ clientX: number; clientY: number }> = [],
+) {
+  const e = new Event(type, { bubbles: true, cancelable: true }) as Event & {
+    touches: Array<{ clientX: number; clientY: number }>
+  }
+  e.touches = touches
+  act(() => {
+    el.dispatchEvent(e)
+  })
+  return e
+}
+
+describe('touch gestures', () => {
+  it('default (capture) mode: one-finger pan moves the viewBox in any direction', () => {
+    const { container, vb } = setup()
+    fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+    const move = fireTouch(container, 'touchmove', [{ clientX: 100, clientY: 40 }])
+    // 60px up on a 500px-tall viewport over a 500-unit box → y pans by +60.
+    expect(vb()).toBe('0 60 800 500')
+    // Capture mode owns the gesture outright — the page never scrolls.
+    expect(move.defaultPrevented).toBe(true)
+  })
+
+  it('cooperative mode: vertical swipes pass through to the page', () => {
+    const { container, vb } = setup({ cooperativeTouch: true })
+    fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+    const move = fireTouch(container, 'touchmove', [{ clientX: 102, clientY: 180 }])
+    // Axis locked to vertical: the SVG must not pan, and the browser keeps
+    // the event (native page scroll).
+    expect(vb()).toBe('0 0 800 500')
+    expect(move.defaultPrevented).toBe(false)
+  })
+
+  it('cooperative mode: horizontal drags pan the SVG', () => {
+    const { container, vb } = setup({ cooperativeTouch: true })
+    fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+    const move = fireTouch(container, 'touchmove', [{ clientX: 180, clientY: 102 }])
+    // 80px right on an 800px-wide viewport over an 800-unit box → x pans by -80
+    // (and the slight 2px downward drift pans y by -2 — 'h' lock gates which
+    // gestures pan, it doesn't zero the other axis mid-pan).
+    expect(vb()).toBe('-80 -2 800 500')
+    expect(move.defaultPrevented).toBe(true)
+  })
+
+  it('cooperative mode: the axis lock is sticky for the whole gesture', () => {
+    const { container, vb } = setup({ cooperativeTouch: true })
+    fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+    fireTouch(container, 'touchmove', [{ clientX: 102, clientY: 180 }]) // locks 'v'
+    // Later the finger moves mostly horizontally — still a page scroll.
+    fireTouch(container, 'touchmove', [{ clientX: 300, clientY: 185 }])
+    expect(vb()).toBe('0 0 800 500')
+  })
+
+  it('cooperative mode: two-finger pinch zooms the SVG, never the page', () => {
+    const { container, zoom } = setup({ cooperativeTouch: true })
+    fireTouch(container, 'touchstart', [
+      { clientX: 300, clientY: 250 },
+      { clientX: 500, clientY: 250 },
+    ])
+    const move = fireTouch(container, 'touchmove', [
+      { clientX: 200, clientY: 250 },
+      { clientX: 600, clientY: 250 },
+    ])
+    expect(zoom()).toBeCloseTo(2, 5) // spread doubled: 200px → 400px
+    expect(move.defaultPrevented).toBe(true)
+  })
+
+  it('touchcancel resets the gesture (no stale drag, fresh axis lock)', () => {
+    const { container, vb } = setup({ cooperativeTouch: true })
+    fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+    fireTouch(container, 'touchmove', [{ clientX: 102, clientY: 180 }]) // locks 'v'
+    fireTouch(container, 'touchcancel')
+    // A brand-new gesture decides its own axis — horizontal now pans.
+    fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+    fireTouch(container, 'touchmove', [{ clientX: 180, clientY: 100 }])
+    expect(vb()).toBe('-80 0 800 500')
+  })
+})

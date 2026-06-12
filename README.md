@@ -127,6 +127,7 @@ Cursor-anchored zoom keeps the point under the pointer fixed by solving for the 
 | `wheel`     | `boolean`                  | `true`  | Enable cursor-anchored wheel zoom.                           |
 | `pan`       | `boolean`                  | `true`  | Enable mouse drag + one-finger touch pan.                    |
 | `pinch`     | `boolean`                  | `true`  | Enable two-finger pinch zoom.                                |
+| `cooperativeTouch` | `boolean`           | `false` | Axis-lock one-finger gestures: horizontal pans the SVG, vertical scrolls the page. See [Mobile](#mobile-cooperative-touch). |
 | `onChange`  | `(vb: ViewBox) => void`    | —       | Fires on every viewBox change.                               |
 
 **Returns** `PanZoomViewBox`:
@@ -182,9 +183,31 @@ pz.setViewBox({
 
 **Declutter ruler labels** — feed label centers/widths through the solver before drawing leader lines back to each true tick.
 
+## Mobile: cooperative touch
+
+A full-width pan/zoom canvas inside a scrollable page is a classic mobile trap: it
+captures every one-finger swipe, so users can't scroll past it. `cooperativeTouch`
+fixes that the way embedded maps do — each one-finger gesture is **axis-locked on
+its first meaningful move**:
+
+- **horizontal** drag → pans the SVG (consumed),
+- **vertical** swipe → left entirely to the browser (native page scroll),
+- **two-finger pinch** → always zooms the SVG, never the page.
+
+```tsx
+const pz = usePanZoomViewBox({ initial, cooperativeTouch: true })
+// the container's CSS must allow the passthrough:
+<div ref={pz.containerRef} style={{ touchAction: 'pan-y pinch-zoom' }}>
+```
+
+`<PanZoomSvg cooperativeTouch>` sets the right `touch-action` automatically. The
+axis lock is sticky for the whole gesture and resets on `touchend`/`touchcancel`,
+so a vertical scroll can't morph into an accidental pan halfway through. Desktop
+behavior (wheel + mouse drag) is unaffected.
+
 ## Notes
 
-- **Touch:** add `touch-action: none` to the container (the `PanZoomSvg` component does this for you).
+- **Touch:** add `touch-action: none` to the container — or `pan-y pinch-zoom` when using `cooperativeTouch` (the `PanZoomSvg` component sets the correct one for you).
 - **SSR:** safe — listeners attach in `useEffect`, so nothing touches the DOM during render.
 - **React 17 – 19** supported (peer dependency `react >= 17`).
 

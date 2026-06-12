@@ -65,7 +65,15 @@ export const PanZoomSvg = forwardRef<PanZoomViewBox, PanZoomSvgProps>(function P
     <div
       ref={api.containerRef}
       className={className}
-      style={{ position: 'relative', overflow: 'hidden', cursor: 'grab', touchAction: 'none', ...style }}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        cursor: 'grab',
+        // Cooperative mode hands vertical swipes back to the browser, so the
+        // page must be allowed to scroll vertically + handle its own pinch.
+        touchAction: hookOptions.cooperativeTouch ? 'pan-y pinch-zoom' : 'none',
+        ...style,
+      }}
     >
       <svg
         {...svgProps}

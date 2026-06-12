@@ -20,6 +20,18 @@ export interface UsePanZoomViewBoxOptions {
   pan?: boolean
   /** Enable two-finger pinch zoom. Default `true`. */
   pinch?: boolean
+  /**
+   * Cooperative touch for canvases embedded in scrollable pages. When `true`,
+   * a one-finger gesture is axis-locked on its first meaningful move:
+   * **horizontal** drags pan the SVG, **vertical** swipes are left to the page
+   * (native scroll). Two-finger pinch always zooms the SVG. Pair the container
+   * with `touch-action: pan-y pinch-zoom` (`PanZoomSvg` does this for you).
+   *
+   * Without this, a full-width diagram swallows every vertical swipe and the
+   * page can't be scrolled past it on phones. Default `false` (the SVG
+   * captures all touch gestures).
+   */
+  cooperativeTouch?: boolean
   /** Fired whenever the viewBox changes (zoom, pan, reset, or imperative set). */
   onChange?: (viewBox: ViewBox) => void
 }
@@ -54,7 +66,11 @@ const DEFAULTS = {
   wheel: true,
   pan: true,
   pinch: true,
+  cooperativeTouch: false,
 } as const
+
+/** One-finger movement (px) before a cooperative gesture commits to an axis. */
+const AXIS_LOCK_SLOP = 6
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 const distance = (ax: number, ay: number, bx: number, by: number) =>
@@ -246,9 +262,14 @@ export function usePanZoomViewBox(
       let vbStartY = 0
       let panning = false
       let lastPinch = 0
+      // Cooperative mode only: the gesture's axis, decided ONCE on the first
+      // move past the slop radius. 'h' → we consume the gesture and pan the
+      // SVG; 'v' → we never preventDefault, so the page scrolls natively.
+      let gestureAxis: 'h' | 'v' | null = null
 
       const onTouchStart = (e: TouchEvent) => {
         if (cfg.pan && e.touches.length === 1) {
+          gestureAxis = null
           panning = true
           panStartX = e.touches[0].clientX
           panStartY = e.touches[0].clientY
@@ -264,18 +285,31 @@ export function usePanZoomViewBox(
             e.touches[1].clientY,
           )
         }
-        e.preventDefault()
+        // Cooperative: no preventDefault here — a one-finger vertical swipe
+        // must remain a native page scroll.
+        if (!cfg.cooperativeTouch) e.preventDefault()
       }
       const onTouchMove = (e: TouchEvent) => {
         if (cfg.pan && panning && e.touches.length === 1) {
+          const dx = e.touches[0].clientX - panStartX
+          const dy = e.touches[0].clientY - panStartY
+          if (cfg.cooperativeTouch) {
+            if (gestureAxis === null && (Math.abs(dx) > AXIS_LOCK_SLOP || Math.abs(dy) > AXIS_LOCK_SLOP)) {
+              gestureAxis = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+            }
+            if (gestureAxis !== 'h') return // vertical → let the page scroll
+            e.preventDefault()
+          }
           const r = el.getBoundingClientRect()
           const cur = vbRef.current
           commit({
             ...cur,
-            x: vbStartX - ((e.touches[0].clientX - panStartX) / r.width) * cur.width,
-            y: vbStartY - ((e.touches[0].clientY - panStartY) / r.height) * cur.height,
+            x: vbStartX - (dx / r.width) * cur.width,
+            y: vbStartY - (dy / r.height) * cur.height,
           })
         } else if (cfg.pinch && e.touches.length === 2) {
+          // Pinch always zooms the SVG, never the page — in both modes.
+          if (cfg.cooperativeTouch) e.preventDefault()
           const d = distance(
             e.touches[0].clientX,
             e.touches[0].clientY,
@@ -290,26 +324,32 @@ export function usePanZoomViewBox(
           }
           lastPinch = d
         }
-        e.preventDefault()
+        if (!cfg.cooperativeTouch) e.preventDefault()
       }
       const onTouchEnd = () => {
         panning = false
         lastPinch = 0
+        gestureAxis = null
       }
       el.addEventListener('touchstart', onTouchStart, { passive: false })
       el.addEventListener('touchmove', onTouchMove, { passive: false })
       el.addEventListener('touchend', onTouchEnd)
+      // touchcancel fires when the browser claims the gesture (e.g. it starts
+      // a native scroll under touch-action: pan-y) — without this the next
+      // touch would resume a stale drag.
+      el.addEventListener('touchcancel', onTouchEnd)
       cleanups.push(() => {
         el.removeEventListener('touchstart', onTouchStart)
         el.removeEventListener('touchmove', onTouchMove)
         el.removeEventListener('touchend', onTouchEnd)
+        el.removeEventListener('touchcancel', onTouchEnd)
       })
     }
 
     return () => cleanups.forEach((fn) => fn())
     // Listeners read live state from refs, so they only re-bind when an
     // enable-flag changes — never on viewBox/zoom updates.
-  }, [cfg.wheel, cfg.pan, cfg.pinch, wheelStep, zoomAbout, commit])
+  }, [cfg.wheel, cfg.pan, cfg.pinch, cfg.cooperativeTouch, wheelStep, zoomAbout, commit])
 
   return {
     containerRef,

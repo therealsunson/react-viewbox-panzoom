@@ -32,6 +32,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
+      # npm's OIDC trusted publishing needs npm >= 11.5; Node 20 bundles npm 10,
+      # which silently falls back to token auth and the registry answers 404.
+      - run: npm install -g npm@11
+
       - run: npm ci
 
       # Guard rails: prepublishOnly runs these too, but failing fast here gives

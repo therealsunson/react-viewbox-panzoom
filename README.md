@@ -142,6 +142,25 @@ Cursor-anchored zoom keeps the point under the pointer fixed by solving for the 
 | `setZoom(z)`     | `(number) => void`            | Absolute zoom about the center.                        |
 | `reset()`        | `() => void`                  | Restore `initial`.                                     |
 | `setViewBox(vb)` | `(ViewBox) => void`           | Imperatively set the window (e.g. fit-to-region).      |
+| `isPanning`      | `boolean`                     | `true` while the user is dragging the canvas.          |
+
+### Styling the drag
+
+The drag runs on imperative listeners, so `isPanning` is the only way a
+consumer can see it. `<PanZoomSvg>` uses it to swap `grab` for `grabbing`; wire
+it yourself when using the hook directly:
+
+```tsx
+<div
+  ref={pz.containerRef}
+  style={{ cursor: pz.isPanning ? 'grabbing' : 'grab', touchAction: 'none' }}
+>
+```
+
+With `cooperativeTouch`, it stays `false` until a one-finger gesture locks to
+the horizontal axis — a vertical swipe is a page scroll, not a pan, and
+reporting it as one would flash the drag styling every time someone scrolls
+past the canvas. It is also `false` during a two-finger pinch: that is a zoom.
 
 ### `<PanZoomSvg>`
 

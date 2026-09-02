@@ -20,6 +20,7 @@ function setup(options?: Partial<UsePanZoomViewBoxOptions>) {
         <svg data-testid="svg" viewBox={api.viewBoxString} />
         <span data-testid="vb">{api.viewBoxString}</span>
         <span data-testid="zoom">{api.zoom.toFixed(5)}</span>
+        <span data-testid="panning">{String(api.isPanning)}</span>
       </div>
     )
   }
@@ -28,14 +29,22 @@ function setup(options?: Partial<UsePanZoomViewBoxOptions>) {
   const container = utils.getByTestId('container') as HTMLDivElement
   // jsdom returns an all-zero rect; give the viewport a real size.
   vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
-    x: 0, y: 0, left: 0, top: 0, right: 800, bottom: 500, width: 800, height: 500,
+    x: 0,
+    y: 0,
+    left: 0,
+    top: 0,
+    right: 800,
+    bottom: 500,
+    width: 800,
+    height: 500,
     toJSON: () => ({}),
   } as DOMRect)
 
   const vb = () => utils.getByTestId('vb').textContent!
   const zoom = () => Number(utils.getByTestId('zoom').textContent)
+  const panning = () => utils.getByTestId('panning').textContent === 'true'
   const api = () => apiBox.current!
-  return { ...utils, container, vb, zoom, api }
+  return { ...utils, container, vb, zoom, panning, api }
 }
 
 afterEach(() => {
@@ -93,7 +102,13 @@ describe('usePanZoomViewBox', () => {
     const { container, zoom, vb } = setup({ wheelStep: 1.2 })
     act(() => {
       container.dispatchEvent(
-        new WheelEvent('wheel', { deltaY: -100, clientX: 0, clientY: 0, bubbles: true, cancelable: true }),
+        new WheelEvent('wheel', {
+          deltaY: -100,
+          clientX: 0,
+          clientY: 0,
+          bubbles: true,
+          cancelable: true,
+        }),
       )
     })
     // Zoomed in by one step...
@@ -106,7 +121,13 @@ describe('usePanZoomViewBox', () => {
     const { container, zoom } = setup({ wheelStep: 1.25 })
     act(() => {
       container.dispatchEvent(
-        new WheelEvent('wheel', { deltaY: 120, clientX: 400, clientY: 250, bubbles: true, cancelable: true }),
+        new WheelEvent('wheel', {
+          deltaY: 120,
+          clientX: 400,
+          clientY: 250,
+          bubbles: true,
+          cancelable: true,
+        }),
       )
     })
     expect(zoom()).toBeCloseTo(0.8, 5) // 1 / 1.25
@@ -193,5 +214,143 @@ describe('touch gestures', () => {
     fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
     fireTouch(container, 'touchmove', [{ clientX: 180, clientY: 100 }])
     expect(vb()).toBe('-80 0 800 500')
+  })
+
+  // ── isPanning ─────────────────────────────────────────────────────────────
+  // The drag lives in imperative listeners, so this flag is a consumer's only
+  // window into it — PanZoomSvg swaps grab/grabbing on it. Every way of getting
+  // it wrong leaves a canvas stuck in the dragging state after the user let go.
+
+  describe('isPanning', () => {
+    it('is false at rest', () => {
+      expect(setup().panning()).toBe(false)
+    })
+
+    it('tracks a mouse drag from press to release', () => {
+      const { container, panning } = setup()
+      act(() => {
+        container.dispatchEvent(
+          new MouseEvent('mousedown', { button: 0, clientX: 100, clientY: 100, bubbles: true }),
+        )
+      })
+      expect(panning()).toBe(true)
+      act(() => {
+        window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('clears when the mouse is released outside the container', () => {
+      // The listener is on window for exactly this reason. If it were on the
+      // element, letting go off-canvas would leave the cursor stuck grabbing.
+      const { container, panning } = setup()
+      act(() => {
+        container.dispatchEvent(
+          new MouseEvent('mousedown', { button: 0, clientX: 10, clientY: 10, bubbles: true }),
+        )
+      })
+      act(() => {
+        document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('ignores a right-click press', () => {
+      const { container, panning } = setup()
+      act(() => {
+        container.dispatchEvent(
+          new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10, bubbles: true }),
+        )
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('stays false when panning is disabled', () => {
+      const { container, panning } = setup({ pan: false })
+      act(() => {
+        container.dispatchEvent(
+          new MouseEvent('mousedown', { button: 0, clientX: 10, clientY: 10, bubbles: true }),
+        )
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('tracks a one-finger touch pan', () => {
+      const { container, panning } = setup()
+      act(() => {
+        fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+      })
+      expect(panning()).toBe(true)
+      act(() => {
+        fireTouch(container, 'touchend')
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('clears on touchcancel, not just touchend', () => {
+      // The browser claims the gesture and no touchend arrives. Without this
+      // the canvas stays visibly "grabbed" until the next touch.
+      const { container, panning } = setup()
+      act(() => {
+        fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+      })
+      act(() => {
+        fireTouch(container, 'touchcancel')
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('is false during a two-finger pinch — that is a zoom, not a pan', () => {
+      const { container, panning } = setup()
+      act(() => {
+        fireTouch(container, 'touchstart', [
+          { clientX: 300, clientY: 250 },
+          { clientX: 500, clientY: 250 },
+        ])
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('clears when a one-finger pan becomes a pinch', () => {
+      const { container, panning } = setup()
+      act(() => {
+        fireTouch(container, 'touchstart', [{ clientX: 300, clientY: 250 }])
+      })
+      expect(panning()).toBe(true)
+      act(() => {
+        fireTouch(container, 'touchstart', [
+          { clientX: 300, clientY: 250 },
+          { clientX: 500, clientY: 250 },
+        ])
+      })
+      expect(panning()).toBe(false)
+    })
+
+    it('cooperative: waits for the axis to lock horizontal', () => {
+      // ⚠ The case that makes this more than a one-liner. In cooperative mode
+      // a touch that has not resolved its axis may still turn out to be a page
+      // scroll, so reporting a pan on touchstart would flash the drag styling
+      // on every scroll past the canvas.
+      const { container, panning } = setup({ cooperativeTouch: true })
+      act(() => {
+        fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+      })
+      expect(panning()).toBe(false)
+      act(() => {
+        fireTouch(container, 'touchmove', [{ clientX: 180, clientY: 102 }])
+      })
+      expect(panning()).toBe(true)
+    })
+
+    it('cooperative: a vertical swipe never reports a pan', () => {
+      const { container, panning } = setup({ cooperativeTouch: true })
+      act(() => {
+        fireTouch(container, 'touchstart', [{ clientX: 100, clientY: 100 }])
+      })
+      act(() => {
+        fireTouch(container, 'touchmove', [{ clientX: 102, clientY: 180 }])
+      })
+      expect(panning()).toBe(false)
+    })
   })
 })

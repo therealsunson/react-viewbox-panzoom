@@ -57,6 +57,22 @@ export interface PanZoomViewBox {
   reset: () => void
   /** Imperatively replace the viewBox (e.g. to fit a sub-region). Updates zoom. */
   setViewBox: (viewBox: ViewBox) => void
+  /**
+   * `true` while the user is actively dragging the canvas (mouse drag, or a
+   * touch gesture that has committed to panning).
+   *
+   * Exists because the drag lives entirely inside imperative listeners, so a
+   * consumer has no other way to know: the obvious use is swapping
+   * `cursor: grab` for `grabbing`, which `PanZoomSvg` now does, but a
+   * fade-out of hover chrome or a "don't animate while dragging" guard reads
+   * the same flag.
+   *
+   * ⚠ In `cooperativeTouch` mode this stays `false` until the gesture's axis
+   * resolves to horizontal. A vertical swipe is a page scroll, not a pan, and
+   * reporting it as one would flash the drag styling on every scroll past the
+   * canvas. It is also `false` during a two-finger pinch — that is a zoom.
+   */
+  isPanning: boolean
 }
 
 const DEFAULTS = {
@@ -117,9 +133,11 @@ export function usePanZoomViewBox(
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [viewBox, setVbState] = useState<ViewBox>(initial)
+  const [isPanning, setIsPanning] = useState(false)
 
   // Live mirrors for the imperative listeners (bound once, see docblock).
   const vbRef = useRef<ViewBox>(viewBox)
+  const panningRef = useRef(false)
   const zoomRef = useRef(1)
   const initialRef = useRef<ViewBox>(initial)
   const onChangeRef = useRef(options.onChange)
@@ -131,6 +149,15 @@ export function usePanZoomViewBox(
   useEffect(() => {
     onChangeRef.current = options.onChange
   }, [options.onChange])
+
+  // Drag flag. Mirrored in a ref and de-duped so a touchmove stream cannot
+  // queue a render per frame — the listeners fire far more often than the flag
+  // changes. Stable identity, so flipping it never re-binds the listeners.
+  const markPanning = useCallback((next: boolean) => {
+    if (panningRef.current === next) return
+    panningRef.current = next
+    setIsPanning(next)
+  }, [])
 
   // Single funnel for every viewBox mutation: updates state + ref + fires onChange.
   const commit = useCallback((vb: ViewBox) => {
@@ -225,6 +252,7 @@ export function usePanZoomViewBox(
       const onDown = (e: MouseEvent) => {
         if (e.button !== 0) return
         dragging = true
+        markPanning(true)
         startX = e.clientX
         startY = e.clientY
         vbStartX = vbRef.current.x
@@ -243,6 +271,7 @@ export function usePanZoomViewBox(
       }
       const onUp = () => {
         dragging = false
+        markPanning(false)
       }
       el.addEventListener('mousedown', onDown)
       window.addEventListener('mousemove', onMove)
@@ -271,6 +300,9 @@ export function usePanZoomViewBox(
         if (cfg.pan && e.touches.length === 1) {
           gestureAxis = null
           panning = true
+          // Cooperative mode does not know yet whether this is a pan or a page
+          // scroll; it commits below, once the axis locks horizontal.
+          if (!cfg.cooperativeTouch) markPanning(true)
           panStartX = e.touches[0].clientX
           panStartY = e.touches[0].clientY
           vbStartX = vbRef.current.x
@@ -278,6 +310,7 @@ export function usePanZoomViewBox(
         }
         if (cfg.pinch && e.touches.length === 2) {
           panning = false
+          markPanning(false) // a pinch is a zoom, not a pan
           lastPinch = distance(
             e.touches[0].clientX,
             e.touches[0].clientY,
@@ -294,10 +327,14 @@ export function usePanZoomViewBox(
           const dx = e.touches[0].clientX - panStartX
           const dy = e.touches[0].clientY - panStartY
           if (cfg.cooperativeTouch) {
-            if (gestureAxis === null && (Math.abs(dx) > AXIS_LOCK_SLOP || Math.abs(dy) > AXIS_LOCK_SLOP)) {
+            if (
+              gestureAxis === null &&
+              (Math.abs(dx) > AXIS_LOCK_SLOP || Math.abs(dy) > AXIS_LOCK_SLOP)
+            ) {
               gestureAxis = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
             }
             if (gestureAxis !== 'h') return // vertical → let the page scroll
+            markPanning(true)
             e.preventDefault()
           }
           const r = el.getBoundingClientRect()
@@ -328,6 +365,7 @@ export function usePanZoomViewBox(
       }
       const onTouchEnd = () => {
         panning = false
+        markPanning(false)
         lastPinch = 0
         gestureAxis = null
       }
@@ -349,7 +387,16 @@ export function usePanZoomViewBox(
     return () => cleanups.forEach((fn) => fn())
     // Listeners read live state from refs, so they only re-bind when an
     // enable-flag changes — never on viewBox/zoom updates.
-  }, [cfg.wheel, cfg.pan, cfg.pinch, cfg.cooperativeTouch, wheelStep, zoomAbout, commit])
+  }, [
+    cfg.wheel,
+    cfg.pan,
+    cfg.pinch,
+    cfg.cooperativeTouch,
+    wheelStep,
+    zoomAbout,
+    commit,
+    markPanning,
+  ])
 
   return {
     containerRef,
@@ -360,5 +407,6 @@ export function usePanZoomViewBox(
     setZoom,
     reset,
     setViewBox,
+    isPanning,
   }
 }

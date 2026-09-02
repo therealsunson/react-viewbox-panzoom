@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-02
+
+### Added
+
+- **`isPanning`** on the hook's returned API — `true` while the user is
+  actively dragging the canvas. The drag lives entirely inside imperative
+  listeners, so consumers previously had no way to observe it; the obvious use
+  is drag styling, but a "don't animate while dragging" guard reads the same
+  flag. It is de-duped against a ref, so a touchmove stream cannot queue a
+  render per frame.
+
+  With `cooperativeTouch` it stays `false` until a one-finger gesture locks to
+  the horizontal axis: a vertical swipe is a page scroll, not a pan, and
+  reporting it as one would flash the drag styling every time someone scrolls
+  past the canvas. It is also `false` during a two-finger pinch — that is a
+  zoom.
+
+### Fixed
+
+- **`<PanZoomSvg>` now shows `cursor: grabbing` while dragging.** It pinned
+  `grab` for the whole lifetime of the canvas, so a drag gave no cursor
+  feedback at all.
+- **`<PanZoomSvg>` no longer shows a grab cursor when `pan={false}`.** A grab
+  cursor on a canvas that cannot be dragged promises an interaction that does
+  not exist. An explicit `style.cursor` still wins in both cases.
+
 ## [0.2.0] - 2026-06-12
 
 ### Added

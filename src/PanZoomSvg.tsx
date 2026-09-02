@@ -30,8 +30,8 @@ export interface PanZoomSvgProps extends Omit<UsePanZoomViewBoxOptions, 'initial
 /**
  * A thin, mostly-unstyled wrapper around {@link usePanZoomViewBox} for when you
  * just want a pannable/zoomable SVG without wiring the hook yourself. It sets
- * only the handful of styles the interaction needs (`touch-action: none`,
- * a grab cursor, and a full-bleed `<svg>`); everything else is yours via
+ * only the handful of styles the interaction needs (`touch-action`, the grab
+ * cursor, and a full-bleed `<svg>`); everything else is yours via
  * `className`/`style`.
  *
  * The component's `ref` exposes the same {@link PanZoomViewBox} API the hook
@@ -68,7 +68,10 @@ export const PanZoomSvg = forwardRef<PanZoomViewBox, PanZoomSvgProps>(function P
       style={{
         position: 'relative',
         overflow: 'hidden',
-        cursor: 'grab',
+        // Grab / grabbing, and NEITHER when panning is off: a grab cursor on a
+        // canvas that cannot be dragged promises an interaction that does not
+        // exist. `style` still wins, so a consumer can override all of it.
+        cursor: hookOptions.pan === false ? undefined : api.isPanning ? 'grabbing' : 'grab',
         // Cooperative mode hands vertical swipes back to the browser, so the
         // page must be allowed to scroll vertically + handle its own pinch.
         touchAction: hookOptions.cooperativeTouch ? 'pan-y pinch-zoom' : 'none',
